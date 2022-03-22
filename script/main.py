@@ -81,8 +81,6 @@ class PPO():
         self.actor_path=self.path+'/actor.pth'
         self.critic_path=self.path+'/actor.pth'
 
-
-
         self.lossvalue_norm=True
         self.loss_coeff_value=0.5
 

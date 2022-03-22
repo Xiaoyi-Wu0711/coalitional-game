@@ -350,7 +350,7 @@ if __name__ == "__main__":
     # np.random.seed(7)
     # # np.random.seed(11)
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    dir='result/'+policy+'_'+current_time
+    dir='./result/'+policy+'_'+current_time
     if not os.path.exists(dir):
         os.makedirs(dir)
     writer = SummaryWriter(dir)
@@ -358,15 +358,15 @@ if __name__ == "__main__":
         total_reward=0
         observation,info=gw.reset()
         while not gw._get_done():
-            # todo: every step controller will assign a new goal to agents
             goal=assign_goal(policy,agents,tasks)
             obs, reward, done, info = gw.step(goal)
             # print('reward',reward)
             total_reward += reward
-            print('reward',total_reward)
+            # print('reward',total_reward)
 
             if done:
-                writer.add_scalar('random/return', total_reward, i)
+                label=str(policy)+'/return'
+                writer.add_scalar(label, total_reward, i)
                 # print("total_reward:", total_reward)
                 print()
 
