@@ -92,7 +92,7 @@ class PPO():
         state = torch.from_numpy(state).float().unsqueeze(0)
         with torch.no_grad():
             action_prob = self.actor_net(state)
-            print('action_prob',action_prob.shape)
+            # print('action_prob',action_prob.shape)
 
             if train==True:
                 if random.random() > self.eps:
@@ -178,14 +178,24 @@ class PPO():
                 for i in range(action_log_prob.shape[0]):
                     prob_0=action_log_prob[i][0][old_action[i][0]]
                     prob_1 =action_log_prob[i][1][old_action[i][1]]
-                    action_log_prob.append([prob_0,prob_1])
+                    act_prob.append([prob_0+prob_1])
 
-                #todo: get the joint action prob by multiply
-                action_log_prob = torch.tensor(action_log_prob, dtype=torch.float) # N*A
+                #todo: get the joint action prob by multiplys
+                action_prob_joint = torch.tensor(act_prob, dtype=torch.float) # N*A
+
+                old_prob=[]
+                for i in range(old_action_log_prob[index].shape[0]):
+                    prob_0 = old_action_log_prob[i][0]
+                    prob_1 = old_action_log_prob[i][1]
+                    old_prob.append([prob_0 + prob_1])
+
+                old_action_prob_joint=torch.tensor(act_prob, dtype=torch.float)
                 # print('act_prob',act_prob)
 
                 a=torch.tensor(1e-5,requires_grad=True)
-                ratio = action_log_prob / torch.maximum(old_action_log_prob[index],a.repeat(act_prob.shape,1))
+                # print('a',a)
+                # ratio = action_log_prob / torch.maximum(old_action_log_prob[index],a.repeat(action_log_prob.shape,1))
+                ratio=torch.exp(action_prob_joint-old_action_prob_joint)
                 surr1 = ratio * advantage
                 surr2 = torch.clamp(ratio, 1 - self.clip_param, 1 + self.clip_param) * advantage
                 # print('torch.min(surr1, surr2)',torch.min(surr1, surr2))
