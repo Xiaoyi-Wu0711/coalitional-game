@@ -18,3 +18,4 @@ python main.py
 
 [grid.py](main.py) is our env. **Greedy/Random** policy is here! 
 
+[result] results with different policy and visualize by tensorboard
