@@ -74,7 +74,7 @@ class PPO():
         self.training_step = 0
 
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.path='result/'+'ppo_'+current_time
+        self.path='./result/'+'ppo_'+current_time
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         self.writer = SummaryWriter(self.path)
@@ -94,6 +94,8 @@ class PPO():
         state = torch.from_numpy(state).float().unsqueeze(0)
         with torch.no_grad():
             action_prob = self.actor_net(state)
+            print('action_prob',action_prob.shape)
+
             if train==True:
                 if random.random() > self.eps:
                     action_prob = action_prob
@@ -144,8 +146,8 @@ class PPO():
         for r in reward[::-1]:
             R = r + self.gamma * R
             Gt.insert(0, R)
+        # Gt is reward to go
         Gt = torch.tensor(Gt, dtype=torch.float)
-
 
         for i in range(self.ppo_update_time):
 
@@ -155,32 +157,45 @@ class PPO():
 
                 Gt_index = Gt[index].view(-1, 1)
                 V = self.critic_net(state[index])
+                # print('v',V)
 
+                #advantage=G-V
                 delta = Gt_index - V
                 advantage = delta.detach()
-                # epoch iteration, PPO core!!!
-                action_prob = self.actor_net(state[index]) #N(batch_size)*A(agent with assigned task)
-                old_action=action[index]
-                act_prob=[]
-                for i in range(action_prob.shape[0]):
-                    #todo: multi task
-                    prob_0=action_prob[i][0][old_action[0][0]]
-                    prob_1 =action_prob[i][1][old_action[0][1]]
-                    act_prob.append([prob_0,prob_1])
 
-                #todo: multi-head
-                act_prob = torch.tensor(act_prob, dtype=torch.float) # N*A
+                # epoch iteration, PPO core!!!
+                action_log_prob = self.actor_net(state[index])# N*A*T
+
+                '''
+                old_action: N*A,
+                old_action[[0]]=1, represent the first agent is going to do task 2;
+                old_action[[1]]=2, represent the second agent is going to do task 3 
+                '''
+                old_action=action[index]
+
+                # compute the log probability by actor network
+                # according to the action used in the old action
+
+                act_prob=[]
+                for i in range(action_log_prob.shape[0]):
+                    prob_0=action_log_prob[i][0][old_action[i][0]]
+                    prob_1 =action_log_prob[i][1][old_action[i][1]]
+                    action_log_prob.append([prob_0,prob_1])
+
+                #todo: get the joint action prob by multiply
+                action_log_prob = torch.tensor(action_log_prob, dtype=torch.float) # N*A
+                # print('act_prob',act_prob)
 
                 a=torch.tensor(1e-5,requires_grad=True)
-                ratio = act_prob / torch.maximum(old_action_log_prob[index],a.repeat(act_prob.shape,1))
+                ratio = action_log_prob / torch.maximum(old_action_log_prob[index],a.repeat(act_prob.shape,1))
                 surr1 = ratio * advantage
                 surr2 = torch.clamp(ratio, 1 - self.clip_param, 1 + self.clip_param) * advantage
-
+                # print('torch.min(surr1, surr2)',torch.min(surr1, surr2))
                 loss_surr=-(torch.min(surr1, surr2)).mean()
+
                 if self.lossvalue_norm:
                     return_std=Gt[index].std()
                     loss_value=torch.mean((self.critic_net(state[index])-Gt[index]).pow(2))/return_std
-
                 else:
                     loss_value = torch.mean((self.critic_net(state[index]) - Gt[index]).pow(2))
 

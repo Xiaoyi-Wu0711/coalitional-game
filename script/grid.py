@@ -335,7 +335,7 @@ if __name__ == "__main__":
               # Agent([1,0]),
               Agent([0,1])]
     tasks = [Task([1,0], 100), Task([0,1], 100),Task([1,1], 100)]
-    policy='greedy'
+    policy='random'
     gw = GridWorld(
         (10, 10),
         agents,
@@ -363,11 +363,16 @@ if __name__ == "__main__":
             obs, reward, done, info = gw.step(goal)
             # print('reward',reward)
             total_reward += reward
+            print('reward',total_reward)
+
             if done:
-                writer.add_scalar('greedy/return', total_reward, i)
+                writer.add_scalar('random/return', total_reward, i)
                 # print("total_reward:", total_reward)
+                print()
 
                 break
+
+        # if i == 4: break
 
     print('finish')
             # gw.render()
