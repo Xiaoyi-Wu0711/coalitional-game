@@ -1,9 +1,11 @@
+import random
 from time import sleep
 import numpy as np
 import sys
 from torch.utils.tensorboard import SummaryWriter
 import os
 import copy
+import datetime
 
 
 REWARD = 1
@@ -169,6 +171,7 @@ class GridWorld:
         self.time = 0
         self.reward = 0
         self.r=copy.copy(self.reward)
+        np.random.seed(10)
 
         # reset tasks and agents
         for task in self.tasks:
@@ -332,17 +335,25 @@ if __name__ == "__main__":
               # Agent([1,0]),
               Agent([0,1])]
     tasks = [Task([1,0], 100), Task([0,1], 100),Task([1,1], 100)]
-    policy='random'
+    policy='greedy'
     gw = GridWorld(
         (10, 10),
         agents,
         tasks,
         timeout=100     
     )
+    # np.random.seed(666)
+    np.random.seed(10)
+    # np.random.seed(100)
 
-    if not os.path.exists('runs_result'):
-        os.makedirs('runs_result')
-    writer = SummaryWriter('runs_result')
+    # # np.random.seed(233)
+    # np.random.seed(7)
+    # # np.random.seed(11)
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    dir='result/'+policy+'_'+current_time
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    writer = SummaryWriter(dir)
     for i in range(5000):
         total_reward=0
         observation,info=gw.reset()
@@ -353,7 +364,7 @@ if __name__ == "__main__":
             # print('reward',reward)
             total_reward += reward
             if done:
-                writer.add_scalar('random/return', total_reward, i)
+                writer.add_scalar('greedy/return', total_reward, i)
                 # print("total_reward:", total_reward)
 
                 break

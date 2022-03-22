@@ -15,6 +15,8 @@ from torch.distributions import Normal, Categorical
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from time import sleep
+import datetime
+
 
 
 from grid import Agent, Task, GridWorld
@@ -37,7 +39,6 @@ class Actor(nn.Module):
         x = x.reshape(len(x), 2, 3)
         action_prob = F.softmax(x, dim=-1)
         return action_prob  # (N, A, T) (batch_size,agent_num,task_num)
-
 
 class Critic(nn.Module):
     def __init__(self,observation_space):
@@ -72,9 +73,15 @@ class PPO():
         self.counter = 0
         self.training_step = 0
 
-        if not os.path.exists('runs_result/ppo'):
-            os.makedirs('runs_result/ppo')
-        self.writer = SummaryWriter('runs_result/ppo')
+        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.path='result/'+'ppo_'+current_time
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+        self.writer = SummaryWriter(self.path)
+        self.actor_path=self.path+'/actor.pth'
+        self.critic_path=self.path+'/actor.pth'
+
+
 
         self.lossvalue_norm=True
         self.loss_coeff_value=0.5
@@ -113,13 +120,14 @@ class PPO():
         return action, action_log_prob  # (N, A)
 
     def save_param(self):
-        torch.save(self.actor_net.state_dict(), 'runs_result/actor_net.pth')
-        torch.save(self.critic_net.state_dict(), 'runs_result/critic_net.pth')
+
+        torch.save(self.actor_net.state_dict(), self.actor_path)
+        torch.save(self.critic_net.state_dict(), self.critic_path)
         print('save completely')
 
     def load(self):
-        self.actor_net.load_state_dict(torch.load( 'runs_result/actor_net.pth'))
-        self.critic_net.load_state_dict(torch.load('runs_result/critic_net.pth'))
+        self.actor_net.load_state_dict(torch.load( self.actor_path))
+        self.critic_net.load_state_dict(torch.load(self.critic_path))
         print('load completely')
 
     def store_transition(self, transition):
@@ -160,6 +168,7 @@ class PPO():
                     prob_1 =action_prob[i][1][old_action[0][1]]
                     act_prob.append([prob_0,prob_1])
 
+                #todo: multi-head
                 act_prob = torch.tensor(act_prob, dtype=torch.float) # N*A
 
                 a=torch.tensor(1e-5,requires_grad=True)
@@ -198,6 +207,7 @@ class PPO():
 
 def main(args):
     # Parameters
+
     agents = [Agent([1,0]),
               # Agent([1,0]),
               Agent([0,1])]
@@ -214,15 +224,12 @@ def main(args):
 
     seed = args.seed
 
-    # wrapped
-
     observation_space = env.obs_dim
     #print('observation_space',observation_space)
 
     action_space = env.act_dim
     #print('action_space',action_space)
     torch.manual_seed(seed)
-
     model=PPO(observation_space,action_space,args)
     Transition = namedtuple('Transition', ['state', 'action', 'a_log_prob', 'reward'])
 
@@ -259,7 +266,6 @@ def main(args):
             observation,info=env.reset()
             total_reward=0
             action, action_prob = model.select_action(observation, train=False)
-			#todo:encode goal
             goal=[]
             for i in range(len(agents)):
                 goal.append(tasks[action[i]].position)
@@ -272,6 +278,7 @@ def main(args):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
 
     # parser.add_argument('--scenario', default="classic_CartPole-v0", type=str)
