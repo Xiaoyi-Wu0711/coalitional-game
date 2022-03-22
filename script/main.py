@@ -51,7 +51,6 @@ class Critic(nn.Module):
         value = self.state_value(x)
         return value
 
-
 class PPO():
 
 
@@ -93,7 +92,6 @@ class PPO():
         with torch.no_grad():
             action_prob = self.actor_net(state)
             # print('action_prob',action_prob.shape)
-
             if train==True:
                 if random.random() > self.eps:
                     action_prob = action_prob
@@ -120,7 +118,6 @@ class PPO():
         return action, action_log_prob  # (N, A)
 
     def save_param(self):
-
         torch.save(self.actor_net.state_dict(), self.actor_path)
         torch.save(self.critic_net.state_dict(), self.critic_path)
         print('save completely')
@@ -173,7 +170,6 @@ class PPO():
 
                 # compute the log probability by actor network
                 # according to the action used in the old action
-
                 act_prob=[]
                 for i in range(action_log_prob.shape[0]):
                     prob_0=action_log_prob[i][0][old_action[i][0]]
