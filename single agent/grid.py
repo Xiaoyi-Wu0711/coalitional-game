@@ -121,7 +121,7 @@ class GridWorld:
         self.info=None
         self.state=None
         #todo: observation dim
-        self.obs_dim=2*self.agent_num+self.skill_num*self.agent_num+self.task_num*2+self.task_num*self.require_num+200
+        self.obs_dim=20*self.agent_num+self.skill_num*self.agent_num+self.task_num*20+self.task_num*self.require_num+200
 
         #todo: action dim
         self.act_dim=len(agents)*len(tasks)
@@ -234,31 +234,39 @@ class GridWorld:
 
     # get observation for a particular agent
     def _get_obs(self,state):
-        #todo:obs_dim
         observations = np.zeros(self.obs_dim)
 
-        #todo: map state
-        state =state.flatten()
-
-        agent_position=np.array(self.info['agent_position']).flatten()
+        state =state.flatten()# 10*10*2
+        agent_pos=np.zeros((self.agent_num,2,10))
+        for i in range(len(self.info['agent_position'])):
+            pos=self.info['agent_position'][i]
+            agent_pos[i][0][pos[0]]=1
+            agent_pos[i][1][pos[1]]=1
+        agent_position=agent_pos.flatten()
         agent_skill=np.array(self.info['agent_skill']).flatten()
         # agent_task=np.array(self.info['agent_skill']).flatten()
-        task_position=np.array(self.info['task_position']).flatten()
+        task_pos=np.zeros((self.task_num,2,10))
+        for i in range(len(self.info['task_position'])):
+            pos=self.info['task_position'][i]
+            task_pos[i][0][pos[0]]=1
+            task_pos[i][1][pos[1]]=1
+
+        task_position=task_pos.flatten()
         task_resource=np.array(self.info['task_resource']).flatten()
 
         offset = 0
 
         # observation: agent position
-        observations[offset:offset+2*self.agent_num] =agent_position
-        offset += 2*self.agent_num
+        observations[offset:offset+self.agent_num*20] =agent_position
+        offset += 20*self.agent_num
 
         # observation: agent skill
         observations[offset:offset+self.skill_num*self.agent_num]=agent_skill
         offset += self.skill_num*self.agent_num
 
         # observation: task position
-        observations[offset:offset+self.task_num*2]=task_position
-        offset += self.task_num*2
+        observations[offset:offset+self.task_num*20]=task_position
+        offset += self.task_num*20
 
         # observation:task_require
         observations[offset:offset+self.task_num*self.require_num]=task_resource
@@ -331,9 +339,9 @@ def assign_goal(policy,agents,tasks):
 
 
 if __name__ == "__main__":
-    agents = [Agent([1,0]),
+    agents = [Agent([1,0]),]
               # Agent([1,0]),
-              Agent([0,1])]
+              # Agent([0,1])]
     tasks = [Task([1,0], 100), Task([0,1], 100),Task([1,1], 100)]
     policy='random'
     gw = GridWorld(
@@ -343,7 +351,7 @@ if __name__ == "__main__":
         timeout=100     
     )
     # np.random.seed(666)
-    np.random.seed(10)
+    # np.random.seed(10)
     # np.random.seed(100)
 
     # # np.random.seed(233)

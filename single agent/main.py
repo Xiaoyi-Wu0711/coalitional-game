@@ -82,41 +82,28 @@ class PPO():
 
         self.lossvalue_norm=True
         self.loss_coeff_value=0.5
+        self.lr=args.lr
+        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), self.lr)
+        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), self.lr)
 
-        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), 1e-3)
-        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), 3e-3)
 
-
-    def select_action(self, state,train):
+    def select_action(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0)
-        with torch.no_grad():
-            action_prob = self.actor_net(state)
-            # print('action_prob',action_prob.shape)
-            if train==True:
-                if random.random() > self.eps:
-                    action_prob = action_prob
-                else:
-                    N, T = action_prob.shape
-                    uniform_prob = np.zeros((N,  T))
-                    for n in range(N):
 
-                        uniform_prob[n] = np.random.uniform(low=0, high=1, size=(T,))
-                    action_prob = torch.tensor(uniform_prob)
-                self.eps*=0.99999
-                self.eps=max(self.eps,0.01)
-            else:
-                action_prob = action_prob
+        # print('action_prob',action_prob.shape)
+        #todo: exploration
+        prob = self.actor_net(state).detach()
+        action = Categorical(torch.Tensor(prob)).sample()
 
-            action,action_log_prob=self.encode(action_prob)
-            return action,action_log_prob
+        return action,prob[:, action.item()]
 
-    def encode(self,action_prob):
-        dist=Categorical(action_prob)
-        agent_action = dist.sample()  # (N, A)
-        log_prob= dist.log_prob(agent_action)
-        action = agent_action.detach()
-        action_log_prob = log_prob.detach()
-        return action, action_log_prob  # (N, A)
+    # def encode(self,action_prob):
+    #     dist=Categorical(action_prob)
+    #     agent_action = dist.sample()  # (N, A)
+    #     log_prob= dist.log_prob(agent_action)
+    #     action = agent_action.detach()
+    #     action_log_prob = log_prob.detach()
+    #     return action, action_log_prob  # (N, A)
 
     def save_param(self):
         torch.save(self.actor_net.state_dict(), self.actor_path)
@@ -136,7 +123,7 @@ class PPO():
         state = torch.tensor([t.state for t in self.buffer], dtype=torch.float)
         action= torch.cat([t.action for t in self.buffer]).long().view(-1,1)
         reward = [t.reward for t in self.buffer]
-        old_action_log_prob=torch.cat([t.a_log_prob for t in self.buffer]).float()
+        old_action_prob=torch.cat([t.action_prob for t in self.buffer]).float()
         R = 0
         Gt = []
         for r in reward[::-1]:
@@ -145,8 +132,6 @@ class PPO():
         # Gt is reward to go
         Gt = torch.tensor(Gt, dtype=torch.float)
         for i in range(self.ppo_update_time):
-
-            self.entropy_coef*=0.9999
 
             for index in BatchSampler(SubsetRandomSampler(range(len(self.buffer))), self.batch_size, False):
 
@@ -159,7 +144,8 @@ class PPO():
                 advantage = delta.detach()
 
                 # epoch iteration, PPO core!!!
-                action_log_prob = self.actor_net(state[index]).gather(1,action[index])# N*T
+
+                action_prob = self.actor_net(state[index]).gather(1,action[index])# N*T
                 #
                 # '''
                 # old_action: N*A,
@@ -190,7 +176,9 @@ class PPO():
                 #
                 # # print('a',a)
                 # # ratio = action_log_prob / torch.maximum(old_action_log_prob[index],a.repeat(action_log_prob.shape,1))
-                ratio=torch.exp(action_log_prob-old_action_log_prob[index])
+                ratio=(action_prob / old_action_prob[index])
+                # self.writer.add_scalar('episode/ratio', ratio, global_step=self.training_step)
+
                 surr1 = ratio * advantage
                 surr2 = torch.clamp(ratio, 1 - self.clip_param, 1 + self.clip_param) * advantage
                 # print('torch.min(surr1, surr2)',torch.min(surr1, surr2))
@@ -250,14 +238,14 @@ def main(args):
     #print('action_space',action_space)
     torch.manual_seed(seed)
     model=PPO(observation_space,action_space,args)
-    Transition = namedtuple('Transition', ['state', 'action', 'a_log_prob', 'reward'])
+    Transition = namedtuple('Transition', ['state', 'action', 'action_prob', 'reward'])
 
     if args.mode=='train':
         for i_epoch in range(args.max_episode):
             observation,info = env.reset()
             total_reward=0
             while not env._get_done():
-                action, action_prob = model.select_action(observation,train=True)
+                action, action_prob= model.select_action(observation)
                 goal = []
                 for i in range(len(agents)):
                     goal.append(tasks[action[0].item()].position)
@@ -307,17 +295,17 @@ if __name__ == '__main__':
     parser.add_argument('--buffer_capacity', default=int(1e5), type=int)
     parser.add_argument('--seed', default=777, type=int)
     parser.add_argument('--batch_size', default=64, type=int)
-    parser.add_argument('--clip_param', default=0.2, type=int)
-    parser.add_argument('--max_grad_norm', default=0.5, type=int)
+    parser.add_argument('--clip_param', default=0.2, type=float)
+    parser.add_argument('--max_grad_norm', default=0.5, type=float)
     parser.add_argument('--ppo_update_time', default=10, type=int)
-    parser.add_argument('--gamma', default=0.99)
-    parser.add_argument('--entropy_coef', default=0.5)
-    parser.add_argument('--eps', default=1)
-    parser.add_argument('--opponent_policy', default='random',help='random/greedy')
+    parser.add_argument('--gamma', default=0.99,type=float)
+    parser.add_argument('--entropy_coef', default=0.5,type=float)
+    parser.add_argument('--eps', default=1,type=float)
+    parser.add_argument('--lr', default=5e-3,type=float)
     parser.add_argument('--mode', default="train", type=str, help="train/evaluate")
     parser.add_argument('--eval_times', default=1000, type=int)
     parser.add_argument('--render', default=False, type=str)
-    parser.add_argument('--agent_number', default=3, type=int)
+    parser.add_argument('--agent_number', default=1, type=int)
 
     args = parser.parse_args()
     main(args)
