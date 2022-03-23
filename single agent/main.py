@@ -89,11 +89,15 @@ class PPO():
 
     def select_action(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0)
-
+        prob=self.actor_net(state).detach()
         # print('action_prob',action_prob.shape)
-        #todo: exploration
-        prob = self.actor_net(state).detach()
-        action = Categorical(torch.Tensor(prob)).sample()
+        if np.random.random()>self.eps:
+            prob = prob
+        else:
+            prob=torch.Tensor(np.random.uniform(low=0,high=1,size=prob.shape))
+        action = Categorical(prob).sample()
+        self.eps*=0.9999
+        self.eps=max(self.eps,0.01)
 
         return action,prob[:, action.item()]
 

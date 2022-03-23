@@ -171,7 +171,7 @@ class GridWorld:
         self.time = 0
         self.reward = 0
         self.r=copy.copy(self.reward)
-        np.random.seed(10)
+        # np.random.seed(args.seed)
 
         # reset tasks and agents
         for task in self.tasks:
@@ -235,7 +235,6 @@ class GridWorld:
     # get observation for a particular agent
     def _get_obs(self,state):
         observations = np.zeros(self.obs_dim)
-
         state =state.flatten()# 10*10*2
         agent_pos=np.zeros((self.agent_num,2,10))
         for i in range(len(self.info['agent_position'])):
@@ -342,8 +341,10 @@ if __name__ == "__main__":
     agents = [Agent([1,0]),]
               # Agent([1,0]),
               # Agent([0,1])]
+    #todo: 一次性生成足够量的任务， 任务做完后消失
+
     tasks = [Task([1,0], 100), Task([0,1], 100),Task([1,1], 100)]
-    policy='random'
+    policy='greedy'
     gw = GridWorld(
         (10, 10),
         agents,
